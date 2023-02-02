@@ -1,0 +1,88 @@
+---
+- name: Remove harbor components
+  shell: "docker-compose down -v"
+  args:
+    chdir: "{{ install_dir }}/harbor"
+  failed_when: false
+
+- name: Remove all containers
+  shell: "/usr/bin/docker ps -aq | xargs -r docker rm -fv"
+  tags: ['docker']
+
+- name: Remove docker package in ["Ubuntu", "Debian"]
+  when: ansible_distribution in ["Ubuntu", "Debian"]
+  apt:
+    name: ['docker-ce', 'docker-ce-cli', 'containerd.io', 'nginx']
+    state: absent
+    force: true
+  register: packages_removed
+  tags: ['services']
+
+- name: Remove docker package in ["CentOS", "RedHat"]
+  when: ansible_distribution in ["CentOS", "RedHat"]
+  yum:
+    name: ['docker-ce', 'docker-ce-cli', 'containerd.io', 'nginx']
+    state: absent
+  failed_when: false
+  register: packages_removed
+  tags: ['services']
+
+- name: Flush iptables
+  iptables:
+    flush: yes
+  tags: ['iptables']
+
+- name: Delete some files and directories
+  command: "rm -rf {{ item }}"
+  with_items:
+    - /usr/local/bin/docker-compose
+    - /usr/bin/docker-compose
+    - /etc/cron.d/check-registry-liveness
+    - /etc/cron.d/registry-backup
+    - /etc/cron.d/registry-logrotation
+    - /etc/cron.d/docker-logrotate
+    - /etc/apt/sources.list.d/kubernetes.list
+    - /etc/apt/sources.list.d/docker.list
+    - /etc/docker/certs.d
+    - /etc/docker/daemon.json
+    - /etc/docker/key.json
+    - /var/log/harbor
+    - /var/lib/docker
+    - /var/lib/containerd
+    - /tmp/harbor-backup.tgz
+    - /tmp/harbor
+    - /tmp/registry-restore.sh
+    - "{{ data_root_dir }}/archive"
+    - "{{ data_root_dir }}/bastion"
+    - "{{ data_root_dir }}/harbor"
+    - "{{ data_root_dir }}/docker"
+    - "{{ data_root_dir }}/packages"
+    - "{{ install_dir }}"
+  tags: ['files']
+
+- name: systemctl daemon-reload
+  systemd:
+    daemon_reload: yes
+
+- name: Restart network
+  systemd:
+    name: >-
+      {% if ansible_distribution == "RedHat" -%}
+      {%- if ansible_distribution_major_version|int == 8 -%}
+      NetworkManager
+      {%- else -%}
+      network
+      {%- endif -%}
+      {%- elif ansible_distribution == "Ubuntu" and ansible_distribution_release == "bionic" -%}
+      systemd-networkd
+      {%- endif %}
+    state: restarted
+  failed_when: false
+  tags:
+    - service
+    - network
+
+- name: systemctl daemon-reload
+  systemd:
+    daemon_reload: yes
+  when: packages_removed.changed

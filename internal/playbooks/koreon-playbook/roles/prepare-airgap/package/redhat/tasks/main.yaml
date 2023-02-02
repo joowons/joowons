@@ -1,0 +1,43 @@
+---
+# Create Package directory
+- name: Package | Create package directory
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ package_data_dir }}"
+    - "{{ package_archive_dir }}"
+    - "{{ package_bastion_dir }}"
+
+- name: Download crictl binary
+  ansible.builtin.get_url:
+    url: "{{ crictl_get_url }}"
+    dest: "{{ package_archive_dir }}"
+  any_errors_fatal: true
+
+- name: Download ETCD binary
+  ansible.builtin.get_url:
+    url: "{{ etcd_get_url }}"
+    dest: "{{ package_archive_dir }}"
+  any_errors_fatal: true
+
+- name: Download helm binary
+  ansible.builtin.get_url:
+    url: "{{ helm_get_url }}"
+    dest: "{{ package_archive_dir }}"
+  any_errors_fatal: true
+
+- name: Package | Install dnf
+  ansible.builtin.yum:
+    name: dnf
+    state: latest
+
+- name: Copy local-repository scripts files
+  template:
+    src: "package-download-{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}.sh.j2"
+    dest: "/tmp/package-download.sh"
+    mode: 0755
+
+# Download the package and create a local repository
+- name: Make local repository
+  shell: "/tmp/package-download.sh"

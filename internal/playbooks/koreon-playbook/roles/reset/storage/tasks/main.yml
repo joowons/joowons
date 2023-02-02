@@ -1,0 +1,94 @@
+---
+- name: Stop nfs server service
+  when: ansible_distribution in ["Ubuntu", "Debian"]
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+  with_items:
+    - nfs-kernel-server
+  failed_when: false
+  tags: ['services']
+
+- name: Stop nfs server service
+  when: ansible_distribution in ["CentOS", "RedHat"]
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+  with_items:
+    - nfs-server
+    - rpcbind
+  failed_when: false
+  tags: ['services']
+
+- name: Remove nfs exports file
+  file:
+    path: "/etc/exports"
+    state: absent
+  tags: ['services']
+
+- name: Delete some files and directories
+  when:
+  - not ((shared_volume_dir is undefined) or (shared_volume_dir is none) or (shared_volume_dir|trim == ''))
+  shell: "rm -rf {{ item }}"
+  with_items:
+    - "{{ shared_volume_dir }}/*"
+    - /etc/exports
+  tags: ['files']
+
+- name: Remove nfs-common, nfs-kernel-server package
+  when: ansible_distribution in ["Ubuntu", "Debian"]
+  apt:
+    name: ['nfs-common', 'nfs-kernel-server']
+    state: absent
+    purge: yes
+    force: yes
+  register: packages_removed
+  tags: ['services']
+
+- name: Remove nfs-utils package
+  when: ansible_distribution in ["CentOS", "RedHat"]
+  yum:
+    name: ['nfs-utils']
+    state: absent
+  register: packages_removed
+  tags: ['services']
+
+- name: Check /etc/yum.repos.d.bak directory existence (offline install)
+  when:
+    - ansible_distribution in ["CentOS", "RedHat"]
+    - closed_network
+  stat:
+    path: /etc/yum.repos.d.bak
+  register: yum_backup_dir_exist
+
+- name: Restore /etc/yum.repos.d.bak directory (offline install)
+  when:
+    - ansible_distribution in ["CentOS", "RedHat"]
+    - closed_network
+    - yum_backup_dir_exist.stat.exists
+  command: "{{ item }}"
+  with_items:
+  - rm -rf /etc/yum.repos.d
+  - mv /etc/yum.repos.d.bak /etc/yum.repos.d
+
+- name: Check /etc/apt/sources.list.bak existence (offline install)
+  when:
+    - ansible_distribution in ["Ubuntu", "Debian"]
+    - closed_network
+  stat:
+    path: /etc/apt/sources.list.bak
+  register: sources_list_bak_stat
+
+- name: Restore /etc/apt/sources.list file (offline install)
+  when:
+    - ansible_distribution in ["Ubuntu", "Debian"]
+    - closed_network
+    - sources_list_bak_stat.stat.exists
+  command: "{{ item }}"
+  with_items:
+    - mv /etc/apt/sources.list.bak /etc/apt/sources.list  
+
+- name: systemctl daemon-reload
+  systemd:
+    daemon_reload: yes
+  when: packages_removed.changed

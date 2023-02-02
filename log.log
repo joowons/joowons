@@ -1,0 +1,4 @@
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2023-01-31T13:42:03.297+0900","caller":"cmd/init.go:30","msg":"Start provisioning for cloud infrastructure"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2023-01-31T13:44:02.793+0900","caller":"cmd/prepare-airgap.go:35","msg":"Start provisioning for preparing a kubernetes cluster and registry"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2023-01-31T13:44:53.534+0900","caller":"cmd/prepare-airgap.go:35","msg":"Start provisioning for preparing a kubernetes cluster and registry"}
+{"level":"\u001b[34mINFO\u001b[0m","ts":"2023-02-01T18:13:35.415+0900","caller":"cmd/prepare-airgap.go:35","msg":"Start provisioning for preparing a kubernetes cluster and registry"}

@@ -1,0 +1,52 @@
+#- Image List
+## Required image items and Addon images.
+prepare_airgap_images: [
+  "docker.io/library/nginx:latest",
+  "docker.io/library/haproxy:latest",
+  "gcr.io/kubernetes-e2e-test-images/dnsutils:1.3",
+  "k8s.gcr.io/pause:{{ image_pause_version | regex_replace('^v', '') }}",
+  "docker.io/coredns/coredns:{{ image_coredns_version | regex_replace('^v', '') }}",
+  "docker.io/calico/cni:{{ image_calico_version }}",
+  "docker.io/calico/node:{{ image_calico_version }}",
+  "docker.io/calico/kube-controllers:{{ image_calico_version }}",
+  "docker.io/calico/typha:{{ image_calico_version }}",
+  "docker.io/calico/pod2daemon-flexvol:{{ image_calico_version }}",
+  "k8s.gcr.io/metrics-server/metrics-server:{{ image_metrics_server_version }}",
+  "k8s.gcr.io/kube-apiserver:{{ prepare_airgap_k8s_version }}",
+  "k8s.gcr.io/kube-controller-manager:{{ prepare_airgap_k8s_version }}",
+  "k8s.gcr.io/kube-scheduler:{{ prepare_airgap_k8s_version }}",
+  "k8s.gcr.io/kube-proxy:{{ prepare_airgap_k8s_version }}",
+  "registry.k8s.io/e2e-test-images/jessie-dnsutils:{{ image_dns_utils_version | regex_replace('^v', '') }}",
+  ## Addon images
+  "registry.k8s.io/sig-storage/livenessprobe:v2.7.0",
+  "registry.k8s.io/sig-storage/nfsplugin:v4.1.0",
+  "regi.acloud.run/library/csi-nfs-diskusage-exporter:1.0.4.2",
+  "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.1",
+  "registry.k8s.io/sig-storage/csi-provisioner:v3.2.0",
+  "ghcr.io/kore3lab/kore-board.backend:v0.5.5",
+  "ghcr.io/kore3lab/kore-board.frontend:v0.5.5",
+  "ghcr.io/kore3lab/kore-board.metrics-scraper:v0.5.5",
+  "ghcr.io/kore3lab/kore-board.terminal:v0.5.5"
+]
+
+bastion_images: [
+  "ghcr.io/acornsoft-edgecraft/kore-on:latest"
+]
+
+prepare_airgap_helm_charts: [
+{% if ListVersion.ListHelmChartVersion.CsiDriverNfs != None %}
+{% for item in (ListVersion.ListHelmChartVersion.CsiDriverNfs | dict2items) %}
+{%   for data in item.value %}
+  "https://hcapital-harbor.acloud.run/chartrepo/cube/charts/csi-driver-nfs-{{ data }}.tgz",
+{%   endfor %}
+{% endfor %}
+{% endif %}
+{% if ListVersion.ListHelmChartVersion.Koreboard != None %}
+{% for item in (ListVersion.ListHelmChartVersion.Koreboard | dict2items) %}
+{%   for data in item.value %}
+  "https://github.com/kore3lab/dashboard/raw/master/scripts/install/kubernetes/kore-board-{{ data | regex_replace('^v', '') }}.tgz",
+{%   endfor %}
+{% endfor %}
+{% endif %}
+]
+#-end Image List

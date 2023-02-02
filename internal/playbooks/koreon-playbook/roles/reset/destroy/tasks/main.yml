@@ -1,0 +1,2 @@
+---
+# This playbook delete k8s services of loadbalancer type and pvc

@@ -1,0 +1,140 @@
+---
+# Init generate inventory and vars
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Init | Configuration
+      ansible.builtin.include_role:
+        name: init
+        apply:
+          tags:
+            - init
+            - reset-cluster
+            - reset-registry
+            - reset-storage
+            - reset-prepare-airgap
+            - reset-all
+      tags:
+        - init
+        - reset-cluster
+        - reset-registry
+        - reset-storage
+        - reset-prepare-airgap
+        - reset-all
+
+# Clear gathered facts from all currently targeted hosts 
+- hosts: all
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Clear gathered facts
+      meta: clear_facts
+      tags:
+        - init-network
+        - reset-cluster
+        - reset-registry
+        - reset-storage
+        - reset-prepare-airgap
+        - reset-all
+
+# Init | Network Check.
+- hosts: all
+  become: false
+  gather_facts: true
+  vars_files:
+    - "{{ playbook_dir }}/inventory/group_vars/basic.yaml"
+    - "{{ playbook_dir }}/inventory/group_vars/expert.yaml"
+  tasks:
+    - name: Init | Network check
+      ansible.builtin.include_role:
+        name: init/network
+        apply:
+          tags:
+            - init
+            - reset-cluster
+            - reset-registry
+            - reset-storage
+            - reset-prepare-airgap
+            - reset-all
+      tags:
+        - init-network
+        - reset-cluster
+        - reset-registry
+        - reset-storage
+        - reset-prepare-airgap
+        - reset-all
+  any_errors_fatal: true
+
+# clean master and worker node
+- hosts: cluster
+  become: true
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/inventory/group_vars/basic.yaml"
+    - "{{ playbook_dir }}/inventory/group_vars/expert.yaml"
+  tasks:
+    - name: Reset | Cluster
+      ansible.builtin.include_role:
+        name: reset
+        apply:
+          tags:
+            - reset-cluster
+            - reset-all
+      tags:
+        - reset-cluster
+        - reset-all
+
+# clean private registry
+- hosts: registry
+  become: true
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/inventory/group_vars/basic.yaml"
+    - "{{ playbook_dir }}/inventory/group_vars/expert.yaml"
+  tasks:
+    - name: Reset | Registry
+      ansible.builtin.include_role:
+        name: reset/registry
+        apply:
+          tags:
+            - reset-registry
+            - reset-all
+      tags:
+        - reset-registry
+        - reset-all
+
+# clean storage
+- hosts: storage
+  become: true
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/inventory/group_vars/basic.yaml"
+    - "{{ playbook_dir }}/inventory/group_vars/expert.yaml"
+  tasks:
+    - name: Reset | Storage
+      ansible.builtin.include_role:
+        name: reset/storage
+        apply:
+          tags:
+            - reset-storage
+            - reset-all
+      tags:
+        - reset-storage
+        - reset-all
+
+# clean prepare-airgap
+- hosts: prepare_airgap
+  become: true
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/inventory/group_vars/basic.yaml"
+    - "{{ playbook_dir }}/inventory/group_vars/expert.yaml"
+  tasks:
+    - name: Reset | prepare_airgap
+      ansible.builtin.include_role:
+        name: prepare-airgap/reset
+        apply:
+          tags:
+            - reset-prepare-airgap
+      tags:
+        - reset-prepare-airgap
