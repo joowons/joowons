@@ -1,11 +1,11 @@
+#jinja2:comment_start_string:'[#' , comment_end_string:'#]'
 #!/bin/bash
-## required repo list
-## docker, kubernetes, nvidia
 
 CURRENT_DATE=`date '+%Y%m%d'`
 CURRENT_TIME=`date '+%Y%m%d_%H%M%S'`
 
-K8S_VERIONS="-{{ prepare_airgap_k8s_version | regex_replace('^v', '') }}"
+K8S_VERIONS="{{ prepare_airgap_k8s_version | regex_replace('^v', '') }}-00"
+CONTAINERD_VERSION="{{ containerd_io }}"
 REPO_DIR="{{ package_data_dir }}"
 PACKAGE_BASTION_DIR="{{ package_bastion_dir }}"
 ARCHIVE_DIR="{{ package_archive_dir }}"
@@ -15,7 +15,6 @@ error_exit() {
     exit 1
 }
 
-# params <pack_name>
 function is_resolved() {
   if [ ${#RESOLVED[@]} -eq 0 ]; then
     return 0
@@ -29,8 +28,6 @@ function is_resolved() {
   done
 }
 
-# params <pack_name>
-# params <pack_name> recursion
 function resolve_recursion() {
   echo $1
   if ! is_resolved $1 || [[ -z "$2" ]]; then
@@ -54,11 +51,11 @@ make_apt_repo(){
     apt-get update -y
 
     (
-    resolve_recursion containerd.io="{{ containerd_io }}"
+    resolve_recursion containerd.io=${CONTAINERD_VERSION}
 
-    resolve_recursion kubelet=${K8S_VERIONS}-00
-    resolve_recursion kubeadm=${K8S_VERIONS}-00
-    resolve_recursion kubectl=${K8S_VERIONS}-00
+    resolve_recursion kubelet=${K8S_VERIONS}
+    resolve_recursion kubeadm=${K8S_VERIONS}
+    resolve_recursion kubectl=${K8S_VERIONS}
 
     resolve_recursion docker-ce
     resolve_recursion docker-ce-cli
@@ -80,6 +77,7 @@ make_apt_repo(){
     resolve_recursion curl
     resolve_recursion net-tools
     resolve_recursion nfs-kernel-server
+    resolve_recursion nfs-server
     resolve_recursion libnfsidmap2
     resolve_recursion libtirpc3
     resolve_recursion rpcbind
@@ -87,7 +85,6 @@ make_apt_repo(){
     resolve_recursion libtirpc-common
     resolve_recursion dnsutils
     resolve_recursion dpkg-dev
-    resolve_recursion nfs-kernel-server
     resolve_recursion tcpdump
 
     resolve_recursion conntrack
@@ -101,19 +98,17 @@ make_apt_repo(){
 
     echo "Downloading $line"
     status=0
-    apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages $line || ((status=$?))
+    apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages -o Dir::cache=$REPO_DIR -o Dir::Cache::archives="./" $line || ((status=$?))
     if [ $status -eq 0 ]; then
     echo "OK."
     else
     echo "Failed $line"
 
-    # Virtual Pcakage Provided. Package Selection
     FLAG_ON=
-    APT_PRINT=$(apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages $line 2>&1 || true)
+    APT_PRINT=$(apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages -o Dir::cache=$REPO_DIR -o Dir::Cache::archives="./" $line 2>&1 || true)
     while read lineapt;
     do
 
-        # Package debconf-2.0 is a virtual package provided by:
         if [[ "$lineapt" =~ by:$ ]]; then
         FLAG_ON=1
         continue
@@ -124,7 +119,7 @@ make_apt_repo(){
         APT_PACK_NAME=$(echo $LINE_PURE | awk '{print $1}')
         APT_PACK_VER=$(echo $LINE_PURE | awk '{print $2}')
         echo "It's downloading $APT_PACK_NAME=$APT_PACK_VER"
-        apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages $APT_PACK_NAME=$APT_PACK_VER
+        apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages -o Dir::cache=$REPO_DIR -o Dir::Cache::archives="./" $APT_PACK_NAME=$APT_PACK_VER
         break
         fi
 
@@ -138,7 +133,16 @@ make_apt_repo(){
 
     rm -rf lock partial pkgcache.bin srcpkgcache.bin Packages.gz
 
-    dpkg-scanpackages -m . | gzip -c > Packages.gz
+    dpkg-scanpackages -m . | gzip -9c > Packages.gz
+}
+
+make_apt_bastion(){
+    cd "$PACKAGE_BASTION_DIR"
+
+    apt-get install -y --download-only --reinstall --allow-downgrades --allow-change-held-packages -o Dir::cache=$REPO_DIR -o Dir::Cache::archives="./" docker-ce
+
+    rm -rf lock partial pkgcache.bin srcpkgcache.bin Packages.gz Packages
+    dpkg-scanpackages -m . > Packages
 }
 
 create_tarball() {
@@ -146,12 +150,15 @@ create_tarball() {
     tar --exclude archive -zcvf $ARCHIVE_DIR/local-repo-"{{prepare_airgap_k8s_version}}"-$CURRENT_TIME.tgz ./
 }
 
+create_bastion_tarball() {
+ 	cd "$PACKAGE_BASTION_DIR"
+    tar --exclude archive -zcvf $ARCHIVE_DIR/bastion-package-$CURRENT_TIME.tgz ./
+}
 
 main() {
 set -e
 
 RESOLVED=()
-
 
     for var in `grep -ri "ID" /etc/os-release`
     do
@@ -177,9 +184,11 @@ RESOLVED=()
 
     if [ "$ID" == "ubuntu" ]; then
         make_apt_repo
+        make_apt_bastion
     fi
 
     create_tarball
+    create_bastion_tarball
 
     echo "Completed"
 }

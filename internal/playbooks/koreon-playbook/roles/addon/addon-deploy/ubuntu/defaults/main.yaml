@@ -1,2 +1,0 @@
----
-helm_get_url: "https://get.helm.sh/helm-{{ Addon.HelmVersion }}-{{ ansible_system | lower }}-amd64.tar.gz"

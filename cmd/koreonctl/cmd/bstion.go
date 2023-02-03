@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/elastic/go-sysinfo"
 	"github.com/mholt/archiver"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,11 @@ import (
 type strBstionCmd struct {
 	verbose         bool
 	archiveFilePath string
+	osRelease       string
+	osArchitecture  string
 }
+
+var err error = nil
 
 func bastionCmd() *cobra.Command {
 	bastionCmd := &strBstionCmd{}
@@ -37,6 +42,7 @@ func bastionCmd() *cobra.Command {
 		},
 	}
 
+	// SubCommand add
 	cmd.AddCommand(emptyCmd())
 
 	// SubCommand validation
@@ -51,7 +57,6 @@ func bastionCmd() *cobra.Command {
 
 func (c *strBstionCmd) run() error {
 	workDir, _ := os.Getwd()
-	var err error = nil
 	logger.Infof("Start provisioning for cloud infrastructure")
 
 	if err = c.bastion(workDir); err != nil {
@@ -61,6 +66,13 @@ func (c *strBstionCmd) run() error {
 }
 
 func (c *strBstionCmd) bastion(workDir string) error {
+	// system info
+	host, err := sysinfo.Host()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	c.osArchitecture = host.Info().Architecture
+	c.osRelease = host.Info().OS.Platform
 	if runtime.GOOS != "linux" {
 		logger.Fatal("This command option is only supported on the Linux platform.")
 	}
@@ -92,7 +104,54 @@ func (c *strBstionCmd) bastion(workDir string) error {
 
 		// Processing template
 		bastionText := template.New("bastionLocalRepoText")
-		temp, err := bastionText.Parse(templates.BastionLocalRepoText)
+		var bastionTemp string
+		var repoPath string
+		if c.osRelease == "ubuntu" {
+			var theTime = time.Now().Format("20060102150405")
+			//Backup apt repository
+			commandArgs := []string{
+				"sudo",
+				"mv",
+				"/etc/apt/sources.list.d",
+				"/etc/apt/sources.list.d-" + theTime,
+			}
+			runExecCommand(commandArgs)
+
+			//Backup apt repository
+			commandArgs = []string{
+				"sudo",
+				"mkdir",
+				"/etc/apt/sources.list.d",
+			}
+			runExecCommand(commandArgs)
+
+			//Backup apt repository
+			commandArgs = []string{
+				"sudo",
+				"mv",
+				"/etc/apt/sources.list",
+				"/etc/apt/sources.list-" + theTime,
+			}
+			runExecCommand(commandArgs)
+
+			//Create empty apt repository
+			commandArgs = []string{
+				"sudo",
+				"touch",
+				"/etc/apt/sources.list",
+			}
+			runExecCommand(commandArgs)
+
+			bastionTemp = templates.UbuntuBastionLocalRepoText
+			repoPath = "/etc/apt/sources.list.d/bastion-local-to-file.list"
+		} else if c.osRelease == "centos" || c.osRelease == "rhel" {
+			bastionTemp = templates.BastionLocalRepoText
+			repoPath = "/etc/yum.repos.d/bastion-local.repo"
+		} else {
+			logger.Fatal("This command option is only supported on the Linux platform(Centos, RedHat, Ubuntu).")
+		}
+
+		temp, err := bastionText.Parse(bastionTemp)
 		if err != nil {
 			logger.Errorf("Template has errors. cause(%s)", err.Error())
 			return err
@@ -107,14 +166,13 @@ func (c *strBstionCmd) bastion(workDir string) error {
 			return err
 		}
 
-		repoPath := "/etc/yum.repos.d"
-		err = ioutil.WriteFile(repoPath+"/bastion-local.repo", buff.Bytes(), 0644)
+		err = ioutil.WriteFile(repoPath, buff.Bytes(), 0644)
 		if err != nil {
 			logger.Fatal(err)
 		}
 	}
+	dockerReset()
 	c.dockerInstall()
-	dockerLoad()
 
 	return nil
 }
@@ -126,73 +184,141 @@ func (c *strBstionCmd) dockerInstall() error {
 			fmt.Println("nothing to changed. exit")
 			os.Exit(1)
 		}
-		commandArgs = []string{
-			"sudo",
-			"yum",
-			"install",
-			"-y",
-			"--disablerepo=*",
-			"--enablerepo=bastion-local-to-file",
-			"docker-ce",
-		}
-		runExecCommand(commandArgs)
+		if c.osRelease == "ubuntu" {
+			//docker install
+			commandArgs = []string{
+				"sudo",
+				"apt-get",
+				"update",
+			}
+			runExecCommand(commandArgs)
 
-		// Calling Sleep method
-		time.Sleep(5 * time.Second)
-		dockerRestart()
+			commandArgs = []string{
+				"sudo",
+				"apt-get",
+				"install",
+				"-y",
+				"docker-ce",
+			}
+			runExecCommand(commandArgs)
+		} else if c.osRelease == "centos" || c.osRelease == "rhel" {
+			commandArgs = []string{
+				"sudo",
+				"yum",
+				"install",
+				"-y",
+				"--disablerepo=*",
+				"--enablerepo=bastion-local-to-file",
+				"docker-ce",
+			}
+			runExecCommand(commandArgs)
+		} else {
+			logger.Fatal("This command option is only supported on the Linux platform(CentOS, RedHat, Ubuntu).")
+		}
 	} else {
 		if !utils.CheckUserInput("> Is this bastion node online network status?\n Are you sure you want to install docker-ce on this node? [y/n] ", "y") {
 			fmt.Println("nothing to changed. exit")
 			os.Exit(1)
 		}
-		commandArgs = []string{
-			"sudo",
-			"yum",
-			"install",
-			"-y",
-			"yum-utils",
-		}
-		runExecCommand(commandArgs)
+		if c.osRelease == "ubuntu" {
+			commandArgs = []string{
+				"sudo",
+				"mkdir",
+				"-p",
+				"/etc/apt/keyrings",
+			}
+			runExecCommand(commandArgs)
+			commandArgs = []string{
+				"sudo",
+				"curl",
+				"-fsSL",
+				"https://download.docker.com/linux/ubuntu/gpg",
+				"-o",
+				"./docker.keyring",
+			}
+			runExecCommand(commandArgs)
+			commandArgs = []string{
+				"sudo",
+				"apt-key",
+				"add",
+				"./docker.keyring",
+			}
+			runExecCommand(commandArgs)
+			commandArgs = []string{
+				"sudo",
+				"lsb_release",
+				"-cs",
+			}
+			lsb_release := runExecCommand(commandArgs)
+			commandArgs = []string{
+				"sudo",
+				"apt-add-repository",
+				"deb [arch=" + c.osArchitecture + "] https://download.docker.com/linux/ubuntu " + lsb_release + " stable",
+			}
+			runExecCommand(commandArgs)
 
-		commandArgs = []string{
-			"sudo",
-			"yum-config-manager",
-			"--add-repo",
-			"https://download.docker.com/linux/centos/docker-ce.repo",
-		}
-		runExecCommand(commandArgs)
+			commandArgs = []string{
+				"sudo",
+				"apt-get",
+				"install",
+				"-y",
+				"docker-ce",
+			}
+			runExecCommand(commandArgs)
 
-		commandArgs = []string{
-			"sudo",
-			"yum",
-			"install",
-			"-y",
-			"docker-ce",
+		} else if c.osRelease == "centos" || c.osRelease == "rhel" {
+			commandArgs = []string{
+				"sudo",
+				"yum",
+				"install",
+				"-y",
+				"yum-utils",
+			}
+			runExecCommand(commandArgs)
+
+			commandArgs = []string{
+				"sudo",
+				"yum-config-manager",
+				"--add-repo",
+				"https://download.docker.com/linux/centos/docker-ce.repo",
+			}
+			runExecCommand(commandArgs)
+
+			commandArgs = []string{
+				"sudo",
+				"yum",
+				"install",
+				"-y",
+				"docker-ce",
+			}
+			runExecCommand(commandArgs)
+		} else {
+			logger.Fatal("This command option is only supported on the Linux platform(CentOS, RedHat, Ubuntu).")
 		}
-		runExecCommand(commandArgs)
 
 		// Calling Sleep method
 		time.Sleep(5 * time.Second)
-		dockerRestart()
+		// dockerRestart()
 	}
 
 	return nil
 }
 
-func runExecCommand(commandArgs []string) error {
+func runExecCommand(commandArgs []string) string {
 	commandLen := len(commandArgs)
 	cmd := utils.ExecCommand(commandArgs[0], commandArgs[1:commandLen])
+
 	out, err := cmd.Output()
-	fmt.Println(string(out))
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			fmt.Println("ExitError:", string(ee.Stderr))
-			return fmt.Errorf("ExitError: %v", string(ee.Stderr))
+			logger.Fatal("ExitError:", string(ee.Stderr))
+			// return fmt.Errorf("ExitError: %v", string(ee.Stderr))
 		} else {
-			return fmt.Errorf("err: %v", err)
+			logger.Fatal("err: %v", err)
+			// return "", fmt.Errorf("err: %v", err)
 		}
 	}
-	return nil
+	return string(out)
 }
 
 func dockerLoad() error {
@@ -216,29 +342,12 @@ func dockerLoad() error {
 	return nil
 }
 
-func dockerRestart() {
+func dockerReset() {
 	var commandArgs = []string{}
 	commandArgs = []string{
 		"sudo",
 		"systemctl",
-		"daemon-reload",
+		"reset-failed",
 	}
 	runExecCommand(commandArgs)
-
-	commandArgs = []string{
-		"sudo",
-		"systemctl",
-		"enable",
-		"docker",
-	}
-	runExecCommand(commandArgs)
-
-	commandArgs = []string{
-		"sudo",
-		"systemctl",
-		"start",
-		"docker",
-	}
-	runExecCommand(commandArgs)
-
 }
