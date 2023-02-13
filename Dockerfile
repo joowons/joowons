@@ -28,12 +28,12 @@ RUN pip3 install --upgrade virtualenv
 RUN python3 -m pip install ansible-core==2.12.3
 RUN python3 -m pip install netaddr
 RUN python3 -m pip install cryptography
-RUN ansible-galaxy collection install community.docker
-RUN ansible-galaxy collection install kubernetes.core
-RUN ansible-galaxy collection install community.general
-RUN ansible-galaxy collection install community.crypto
-RUN ansible-galaxy collection install ansible.posix
-RUN ansible-galaxy collection install ansible.utils
+RUN ansible-galaxy collection install --ignore-certs community.docker
+RUN ansible-galaxy collection install --ignore-certs kubernetes.core
+RUN ansible-galaxy collection install --ignore-certs community.general
+RUN ansible-galaxy collection install --ignore-certs community.crypto
+RUN ansible-galaxy collection install --ignore-certs ansible.posix
+RUN ansible-galaxy collection install --ignore-certs ansible.utils
 RUN curl -O https://get.helm.sh/helm-v3.10.3-linux-amd64.tar.gz
 RUN tar -zxvf helm-v3.10.3-linux-amd64.tar.gz
 RUN mv linux-amd64/helm /usr/bin/helm 
