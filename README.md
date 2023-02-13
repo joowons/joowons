@@ -18,7 +18,7 @@ Documentation is in the `/docs` directory
 ## Supported Linux Distributions
 
 - **Ubuntu** 20.04
-- **CentOS/RHEL** 8
+- **CentOS/RHEL** 7, 8
 
 ## Supported Components
 
