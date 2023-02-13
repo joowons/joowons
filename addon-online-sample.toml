@@ -23,7 +23,7 @@
 ## - ssh-port: K8s Controlplane Node ssh port (default: 22)
 ## - addon-data-dir: addon data(helm vales, k8s deployment yaml) dir (default: "/data/addon")
 ## -
-k8s-master-ip = "192.168.88.121"
+k8s-master-ip = "192.168.77.212"
 #ssh-port = 22
 #addon-data-dir = "/data/addon"
 #closed-network = true
