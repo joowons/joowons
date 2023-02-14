@@ -172,4 +172,4 @@
 ## - 
 #k8s-version = "v1.21"
 #registry-version = "v2.6"
-registry-ip = "192.168.88.212"
+registry-ip = "192.168.77.212"
