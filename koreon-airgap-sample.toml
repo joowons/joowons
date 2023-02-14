@@ -153,7 +153,7 @@ registry-archive-file = "internal/playbooks/koreon-playbook/download/harbor-v2.6
 ## - install: NFS Server Installation (default: false)
 install = true
 #type = nfs
-storage-ip = "192.168.88.126"
+storage-ip = "192.168.77.126"
 private-ip = "10.10.20.31"
 #volume-dir = "/data/storage"
 #nfs_version = "4.1"
