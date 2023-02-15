@@ -120,7 +120,7 @@ private-ip = ["10.10.20.21","10.10.20.22"]
 ## - public-cert: public cert activate (default: false)
 install = true
 #registry-version = "v2.6.0"
-registry-ip = "192.168.88.126"
+registry-ip = "192.168.77.213"
 private-ip = "10.10.20.31"
 #registry-domain = "x.x.x.x"
 #data-dir = "/data/harbor"
