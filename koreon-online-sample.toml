@@ -99,7 +99,7 @@ private-ip = ["10.10.20.11","10.10.20.12","10.10.20.13"]
 ## - private-ip: K8s work nodes private ip address.
 ##               If you use the same IP address, you can skip it.
 ## Optional
-ip = ["192.168.88.124","192.168.88.125"]
+ip = ["192.168.77.124","192.168.77.125"]
 private-ip = ["10.10.20.21","10.10.20.22"]
 
 [private-registry]
